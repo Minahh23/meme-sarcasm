@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>JS Meme Microservice</title>
+    <style>
+      body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #111; color: #fff; padding: 20px; }
+      .wrap { width: 900px; max-width: 95vw; background: #222; padding: 24px; border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.6); }
+      h2 { margin: 0 0 16px 0; }
+      .form-group { margin-bottom: 14px; display: flex; flex-direction: column; }
+      label { font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #aaa; }
+      input[type=text], input[type=number], input[type=file] { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #111; color: #fff; font-size: 14px; }
+      input[type=text]:focus, input[type=number]:focus { outline: none; border-color: #06f; }
+      .form-row { display: flex; gap: 12px; }
+      .form-row > .form-group { flex: 1 }
+      .buttons { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+      button { padding: 10px 16px; border-radius: 6px; border: 0; background: #06f; color: #fff; cursor: pointer; font-weight: 600; }
+      button:hover { background: #0058cc; }
+      button.secondary { background: #444; }
+      button.secondary:hover { background: #555; }
+      .result { margin-top: 24px; padding: 16px; border-radius: 6px; background: #1a1a1a; border: 1px solid #444; }
+      .result-img { max-width: 100%; height: auto; border-radius: 4px; margin-bottom: 12px; }
+      .result-link { font-size: 12px; word-break: break-all; color: #08f; text-decoration: none; }
+      .error { color: #f44; padding: 10px; border-radius: 4px; background: #1a0000; border: 1px solid #664; }
+      .success { color: #4f4; padding: 10px; border-radius: 4px; background: #001a00; border: 1px solid #464; }
+      .hidden { display: none; }
+      .loading { color: #08f; font-style: italic; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h2>JS Meme Microservice</h2>
+      <form id="memeForm">
+        <div class="form-group">
+          <label for="topText">Top Text (max 200 chars)</label>
+          <input id="topText" type="text" placeholder="TOP TEXT" value="When you fix a bug" maxlength="200" />
+        </div>
+        <div class="form-group">
+          <label for="bottomText">Bottom Text (max 200 chars)</label>
+          <input id="bottomText" type="text" placeholder="BOTTOM TEXT" value="But it reappears tomorrow" maxlength="200" />
+        </div>
+        <div class="form-group">
+          <label for="bgFile">Background Image (optional, max 5 MB)</label>
+          <input id="bgFile" type="file" accept="image/*" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="width">Width (800-2400)</label>
+            <input id="width" type="number" value="1200" min="800" max="2400" />
+          </div>
+          <div class="form-group">
+            <label for="height">Height (800-2400)</label>
+            <input id="height" type="number" value="675" min="800" max="2400" />
+          </div>
+        </div>
+        <div class="buttons">
+          <button type="button" id="renderBtn">Render PNG</button>
+          <button type="button" id="renderDataUrlBtn" class="secondary">Render Data-URL</button>
+          <button type="reset" class="secondary">Clear</button>
+        </div>
+      </form>
+      <div id="resultContainer" class="hidden">
+        <div id="message"></div>
+        <div id="resultContent"></div>
+      </div>
+    </div>
+
+    <script>
+      const form = document.getElementById('memeForm');
+      const resultContainer = document.getElementById('resultContainer');
+      const message = document.getElementById('message');
+      const resultContent = document.getElementById('resultContent');
+      const renderBtn = document.getElementById('renderBtn');
+      const renderDataUrlBtn = document.getElementById('renderDataUrlBtn');
+
+      function showResult(html, isError = false) {
+        resultContainer.classList.remove('hidden');
+        message.innerHTML = '';
+        resultContent.innerHTML = html;
+        if (isError) resultContent.classList.add('error');
+        else resultContent.classList.remove('error');
+      }
+
+      function showMessage(text, isError = false) {
+        resultContainer.classList.remove('hidden');
+        message.innerHTML = `<div class="${isError ? 'error' : 'success'}">${text}</div>`;
+        resultContent.innerHTML = '';
+      }
+
+      async function render(endpoint) {
+        const top = document.getElementById('topText').value;
+        const bottom = document.getElementById('bottomText').value;
+        const width = document.getElementById('width').value;
+        const height = document.getElementById('height').value;
+        const bgFile = document.getElementById('bgFile').files[0];
+
+        const fd = new FormData();
+        fd.append('top', top);
+        fd.append('bottom', bottom);
+        fd.append('width', width);
+        fd.append('height', height);
+        if (bgFile) fd.append('bg', bgFile);
+
+        showMessage('Rendering...', false);
+        renderBtn.disabled = true;
+        renderDataUrlBtn.disabled = true;
+
+        try {
+          const res = await fetch(endpoint, { method: 'POST', body: fd });
+          const data = await res.json();
+
+          if (!res.ok) {
+            const errorMsg = data.errors ? data.errors.join(', ') : data.error;
+            showResult(`<div class="error">${errorMsg}</div>`, true);
+          } else if (endpoint === '/render-dataurl') {
+            // Show data-URL result
+            const img = `<img src="${data.dataUrl}" class="result-img" />`;
+            const link = `<a href="${data.dataUrl}" download="meme.png" class="result-link">Download as PNG</a>`;
+            showResult(`${img}<p>${link}</p>`, false);
+            showMessage('Rendered via data-URL endpoint', false);
+          } else {
+            // For /render, blob response
+            showMessage('Rendered via PNG endpoint', false);
+          }
+        } catch (err) {
+          showResult(`<div class="error">${err.message}</div>`, true);
+        } finally {
+          renderBtn.disabled = false;
+          renderDataUrlBtn.disabled = false;
+        }
+      }
+
+      // Handle /render endpoint (binary PNG download)
+      renderBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const top = document.getElementById('topText').value;
+        const bottom = document.getElementById('bottomText').value;
+        const width = document.getElementById('width').value;
+        const height = document.getElementById('height').value;
+        const bgFile = document.getElementById('bgFile').files[0];
+
+        const fd = new FormData();
+        fd.append('top', top);
+        fd.append('bottom', bottom);
+        fd.append('width', width);
+        fd.append('height', height);
+        if (bgFile) fd.append('bg', bgFile);
+
+        showMessage('Downloading...', false);
+        renderBtn.disabled = true;
+        renderDataUrlBtn.disabled = true;
+
+        try {
+          const res = await fetch('/render', { method: 'POST', body: fd });
+          if (!res.ok) {
+            const data = await res.json();
+            const errorMsg = data.errors ? data.errors.join(', ') : data.error;
+            showResult(`<div class="error">${errorMsg}</div>`, true);
+          } else {
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'meme.png';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            showMessage('Downloaded meme.png', false);
+          }
+        } catch (err) {
+          showResult(`<div class="error">${err.message}</div>`, true);
+        } finally {
+          renderBtn.disabled = false;
+          renderDataUrlBtn.disabled = false;
+        }
+      });
+
+      // Handle /render-dataurl endpoint
+      renderDataUrlBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        render('/render-dataurl');
+      });
+    </script>
+  </body>
+</html>

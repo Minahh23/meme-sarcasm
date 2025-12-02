@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>JS Meme Generator</title>
+    <style>
+      body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:#111; color:#fff }
+      .wrap { width:900px; max-width:95vw; background:#222; padding:18px; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,0.6) }
+      .controls { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap }
+      .controls input[type=text] { flex:1 1 200px; padding:8px 10px; border-radius:6px; border:1px solid #444; background:#111; color:#fff }
+      .controls button { padding:8px 12px; border-radius:6px; border:0; background:#06f; color:#fff; cursor:pointer }
+      canvas { display:block; width:100%; height:auto; border-radius:4px; background:#333 }
+      footer { margin-top:10px; font-size:13px; color:#bbb }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h2 style="margin:0 0 10px 0">JS Meme Generator</h2>
+      <div class="controls">
+        <input id="topText" type="text" placeholder="Top text" value="When you fix a bug" />
+        <input id="bottomText" type="text" placeholder="Bottom text" value="But it reappears tomorrow" />
+        <input id="uploadBg" type="file" accept="image/*" />
+        <button id="clearBg">Clear BG</button>
+        <button id="randomBg">Random BG</button>
+        <button id="download">Download PNG</button>
+      </div>
+      <canvas id="memeCanvas" width="1200" height="675" aria-label="Meme canvas"></canvas>
+      <footer>Tip: change text and click Download. No external images required.</footer>
+    </div>
+    <script src="meme.js"></script>
+  </body>
+</html>
