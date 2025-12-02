@@ -204,3 +204,60 @@ describe('GET /templates', () => {
     expect(template.textLayout).toBeDefined();
   });
 });
+
+describe('POST /generate', () => {
+  it('requires description parameter', async () => {
+    const res = await request(app)
+      .post('/generate')
+      .send({ description: '' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+  });
+
+  it('generates meme spec from natural language description', async () => {
+    const res = await request(app)
+      .post('/generate')
+      .send({ description: 'Tell them: This is fine. On top: Dogs barking' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spec).toBeDefined();
+    expect(res.body.source).toBe('heuristic');
+    expect(res.body.spec.templateId).toBeDefined();
+    expect(res.body.spec.top).toBeDefined();
+    expect(res.body.spec.bottom).toBeDefined();
+    expect(res.body.spec.width).toBeGreaterThan(0);
+    expect(res.body.spec.height).toBeGreaterThan(0);
+  });
+
+  it('splits description by sentence', async () => {
+    const res = await request(app)
+      .post('/generate')
+      .send({ description: 'Me studying. Me before the exam.' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spec.top).toBeTruthy();
+    expect(res.body.spec.bottom).toBeTruthy();
+  });
+
+  it('handles key:value format', async () => {
+    const res = await request(app)
+      .post('/generate')
+      .send({ description: 'top: Success\nbottom: Failure\ntemplate: drake' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spec.top).toMatch(/Success/);
+    expect(res.body.spec.bottom).toMatch(/Failure/);
+    expect(res.body.spec.templateId).toBe('drake');
+  });
+
+  it('clamps text length to MAX_TEXT_LENGTH', async () => {
+    const longText = 'a'.repeat(300);
+    const res = await request(app)
+      .post('/generate')
+      .send({ description: `top: ${longText}` });
+
+    expect(res.status).toBe(200);
+    expect(res.body.spec.top.length).toBeLessThanOrEqual(200);
+  });
+});
