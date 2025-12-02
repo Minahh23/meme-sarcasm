@@ -33,6 +33,112 @@ function validateInput(top, bottom, width, height) {
 app.get('/', (req, res) => res.send('js-meme renderer OK'));
 app.get('/form', (req, res) => res.sendFile(path.join(__dirname, 'form.html')));
 
+// Sarcasm detection helper
+function detectSarcasm(text) {
+  if (!text) return { confidence: 0, indicators: [] };
+  
+  const indicators = [];
+  let score = 0;
+  
+  // All caps (common sarcasm indicator)
+  if (text === text.toUpperCase() && text.length > 5) {
+    score += 0.25;
+    indicators.push('ALL_CAPS');
+  }
+  
+  // Excessive punctuation
+  const exclamationCount = (text.match(/!/g) || []).length;
+  if (exclamationCount >= 3) {
+    score += 0.2;
+    indicators.push('EXCESSIVE_PUNCTUATION');
+  }
+  
+  // Sarcasm keywords and patterns
+  const sarcasmPatterns = [
+    /yeah[,.]? right/i,
+    /sure[,.]? (buddy|pal|friend)/i,
+    /what could go wrong/i,
+    /oh great/i,
+    /brilliant/i,
+    /wonderful/i,
+    /fantastic idea/i,
+  ];
+  
+  for (const pattern of sarcasmPatterns) {
+    if (pattern.test(text)) {
+      score += 0.3;
+      indicators.push('SARCASM_PATTERN');
+      break;
+    }
+  }
+  
+  // Question with negative sentiment
+  if (text.includes('?') && (text.includes('why') || text.includes('how'))) {
+    score += 0.1;
+    indicators.push('RHETORICAL_QUESTION');
+  }
+  
+  // Clamp confidence to 0-1
+  const confidence = Math.min(score, 1.0);
+  return { confidence: parseFloat(confidence.toFixed(2)), indicators };
+}
+
+// GET /sarcasm
+// Detects sarcasm in text. Returns confidence score (0-1) and indicators.
+app.get('/sarcasm', (req, res) => {
+  const text = req.query.text || '';
+  if (!text) {
+    return res.status(400).json({ error: 'text parameter required' });
+  }
+  
+  const result = detectSarcasm(text);
+  res.json(result);
+});
+
+// GET /templates
+// Returns available meme templates with preset dimensions and text positions.
+app.get('/templates', (req, res) => {
+  const templates = [
+    {
+      id: 'gradient',
+      name: 'Gradient Meme',
+      description: 'Simple gradient background with top/bottom text',
+      width: 1200,
+      height: 675,
+      textLayout: [
+        { position: 'top', y: 0.12 },
+        { position: 'bottom', y: 0.88 }
+      ]
+    },
+    {
+      id: 'drake',
+      name: 'Drake (mock/approve)',
+      description: 'Two rows: top row (disapprove), bottom row (approve)',
+      width: 1200,
+      height: 800,
+      textLayout: [
+        { position: 'top', y: 0.25 },
+        { position: 'bottom', y: 0.75 }
+      ]
+    },
+    {
+      id: 'loss',
+      name: 'Loss (4-panel)',
+      description: 'Four-panel meme layout (coming soon)',
+      width: 1200,
+      height: 900,
+      textLayout: [
+        { position: 'top-left', y: 0.25 },
+        { position: 'top-right', y: 0.25 },
+        { position: 'bottom-left', y: 0.75 },
+        { position: 'bottom-right', y: 0.75 }
+      ]
+    }
+  ];
+  
+  res.json({ templates });
+});
+
 // POST /render
 // Accepts multipart/form-data with optional file field 'bg' (image)
 // and text fields 'top', 'bottom', 'width', 'height'. Returns PNG image.

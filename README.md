@@ -63,6 +63,15 @@ docker build -t js-meme .
 docker run -p 3000:3000 js-meme
 ```
 
+### Docker Hub Deployment
+
+Tags of the form `v*.*.* ` (e.g., `v1.0.0`) trigger an automatic Docker build and push to Docker Hub.
+
+1. Create a GitHub secret `DOCKER_USERNAME` and `DOCKER_PASSWORD` in your repo settings.
+2. Tag a release: `git tag v1.0.0 && git push origin v1.0.0`
+3. GitHub Actions builds and pushes to Docker Hub automatically.
+4. Pull the image: `docker pull <username>/js-meme:v1.0.0`
+
 ## Validation
 
 The microservice validates all inputs:
@@ -104,12 +113,41 @@ Windows users should install via Docker or follow: https://www.npmjs.com/package
 |--------|------|-------|--------|
 | GET | `/` | — | Health message |
 | GET | `/form` | — | HTML form demo |
+| GET | `/templates` | — | JSON list of meme templates |
+| GET | `/sarcasm` | `text` query param | JSON `{confidence, indicators}` |
 | POST | `/render` | Form-data (top, bottom, bg, width, height) | PNG binary |
 | POST | `/render-dataurl` | Form-data (top, bottom, bg, width, height) | JSON `{dataUrl: "..."}`|
 
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup instructions, coding standards, and PR guidelines.
+
+## Features
+
+### Sarcasm Detection API
+
+```bash
+curl "http://localhost:3000/sarcasm?text=oh%20great%20idea"
+# Returns: { "confidence": 0.45, "indicators": ["ALL_CAPS", "SARCASM_PATTERN"] }
+```
+
+Detects sarcasm using:
+- ALL CAPS text
+- Excessive punctuation
+- Sarcasm keywords and patterns
+- Rhetorical questions
+
+### Meme Templates
+
+```bash
+curl http://localhost:3000/templates
+# Returns list of templates with preset dimensions and text positions
+```
+
+Includes:
+- Gradient (default)
+- Drake (mock/approve)
+- Loss (4-panel, coming soon)
 
 ## Branch Protection (optional)
 

@@ -157,3 +157,50 @@ describe('GET /form', () => {
     expect(res.text).toMatch(/Meme/i);
   });
 });
+
+describe('GET /sarcasm', () => {
+  it('requires text parameter', async () => {
+    const res = await request(app).get('/sarcasm');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+  });
+
+  it('detects ALL CAPS sarcasm', async () => {
+    const res = await request(app).get('/sarcasm?text=OH%20GREAT%20IDEA');
+    expect(res.status).toBe(200);
+    expect(res.body.confidence).toBeGreaterThan(0);
+    expect(res.body.indicators).toContain('ALL_CAPS');
+  });
+
+  it('detects sarcasm patterns', async () => {
+    const res = await request(app).get('/sarcasm?text=yeah%20right%20buddy');
+    expect(res.status).toBe(200);
+    expect(res.body.confidence).toBeGreaterThan(0.2);
+    expect(res.body.indicators).toContain('SARCASM_PATTERN');
+  });
+
+  it('returns 0 confidence for neutral text', async () => {
+    const res = await request(app).get('/sarcasm?text=hello%20world');
+    expect(res.status).toBe(200);
+    expect(res.body.confidence).toBe(0);
+  });
+});
+
+describe('GET /templates', () => {
+  it('returns list of templates', async () => {
+    const res = await request(app).get('/templates');
+    expect(res.status).toBe(200);
+    expect(res.body.templates).toBeDefined();
+    expect(res.body.templates.length).toBeGreaterThan(0);
+  });
+
+  it('each template has required fields', async () => {
+    const res = await request(app).get('/templates');
+    const template = res.body.templates[0];
+    expect(template.id).toBeDefined();
+    expect(template.name).toBeDefined();
+    expect(template.width).toBeGreaterThan(0);
+    expect(template.height).toBeGreaterThan(0);
+    expect(template.textLayout).toBeDefined();
+  });
+});
