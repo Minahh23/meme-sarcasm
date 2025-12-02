@@ -1,5 +1,7 @@
 # JS Meme Generator
 
+[![CI](https://github.com/Minahh23/meme-sarcasm/actions/workflows/nodejs.yml/badge.svg?branch=master)](https://github.com/Minahh23/meme-sarcasm/actions/workflows/nodejs.yml)
+
 Simple meme generator with client-side UI, CLI rendering, and Express microservice.
 
 ## Features
