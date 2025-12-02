@@ -106,3 +106,20 @@ Windows users should install via Docker or follow: https://www.npmjs.com/package
 | GET | `/form` | — | HTML form demo |
 | POST | `/render` | Form-data (top, bottom, bg, width, height) | PNG binary |
 | POST | `/render-dataurl` | Form-data (top, bottom, bg, width, height) | JSON `{dataUrl: "..."}`|
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup instructions, coding standards, and PR guidelines.
+
+## Branch Protection (optional)
+
+To require CI pass and PR reviews before merging to `master`:
+
+1. Go to **Settings** → **Branches** → **Add rule**
+2. Pattern: `master`
+3. Enable:
+   - ✅ **Require a pull request before merging**
+   - ✅ **Require approvals** (set to 1 or more)
+   - ✅ **Require status checks to pass before merging** → Select "CI - Node.js"
+   - ✅ **Require branches to be up to date before merging**
+4. Click **Create**
