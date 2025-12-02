@@ -17,6 +17,8 @@ const upload = multer({
 });
 
 const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 const PORT = process.env.PORT || 3000;
 
 // Validation helper
@@ -200,6 +202,125 @@ app.post('/render-dataurl', upload.single('bg'), async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+    // Helper: fallback parser that converts a free-text description into a meme spec
+    function parseDescriptionFallback(description) {
+      const spec = {
+        templateId: 'gradient',
+        top: '',
+        bottom: '',
+        width: 1200,
+        height: 675,
+        bg: null
+      };
+
+      if (!description) return spec;
+
+      // Try simple key:value parsing (top: ..., bottom: ...)
+      const lines = description.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        const kv = line.split(/:\s*/);
+        if (kv.length >= 2) {
+          const key = kv[0].toLowerCase();
+          const val = kv.slice(1).join(':').trim();
+          if (key.startsWith('top')) spec.top = val;
+          else if (key.startsWith('bottom')) spec.bottom = val;
+          else if (key === 'template' || key === 'templateid') spec.templateId = val;
+          else if (key === 'width') spec.width = parseInt(val, 10) || spec.width;
+          else if (key === 'height') spec.height = parseInt(val, 10) || spec.height;
+        }
+      }
+
+      // If no explicit top/bottom, heuristically split sentence in half
+      if (!spec.top && !spec.bottom) {
+        const sentences = description.split(/[\.\!\?]+\s*/).filter(Boolean);
+        if (sentences.length >= 2) {
+          spec.top = sentences[0];
+          spec.bottom = sentences.slice(1).join(' ');
+        } else {
+          // split by comma or mid-point
+          const commaSplit = description.split(',').map(s => s.trim()).filter(Boolean);
+          if (commaSplit.length >= 2) {
+            spec.top = commaSplit[0];
+            spec.bottom = commaSplit.slice(1).join(', ');
+          } else {
+            const words = description.split(/\s+/);
+            const mid = Math.ceil(words.length / 2);
+            spec.top = words.slice(0, mid).join(' ');
+            spec.bottom = words.slice(mid).join(' ');
+          }
+        }
+      }
+
+      // Clamp text lengths
+      spec.top = spec.top.slice(0, MAX_TEXT_LENGTH);
+      spec.bottom = spec.bottom.slice(0, MAX_TEXT_LENGTH);
+
+      return spec;
+    }
+
+    // POST /generate
+    // Accepts JSON { description: string } and returns a strict meme spec JSON.
+    app.post('/generate', async (req, res) => {
+      try {
+        const description = (req.body.description || '').toString().trim();
+        if (!description) return res.status(400).json({ error: 'description required' });
+
+        // If LLAMA4_API_URL is configured, try calling it. Expect JSON response or text containing JSON.
+        const apiUrl = process.env.LLAMA4_API_URL;
+        const apiKey = process.env.LLAMA4_API_KEY;
+
+        if (apiUrl && apiKey) {
+          try {
+            const prompt = `Produce a JSON object with fields: templateId (string), top (string), bottom (string), width (number), height (number). Respond with only valid JSON.` +
+              `\nDescription:\n${description}`;
+
+            const resp = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify({ input: prompt, max_tokens: 256 })
+            });
+
+            const text = await resp.text();
+            // Try parse JSON directly, otherwise try to extract JSON substring
+            let parsed = null;
+            try {
+              parsed = JSON.parse(text);
+            } catch (e) {
+              const m = text.match(/\{[\s\S]*\}/);
+              if (m) {
+                try { parsed = JSON.parse(m[0]); } catch (e2) { parsed = null; }
+              }
+            }
+
+            if (parsed && typeof parsed === 'object') {
+              // Normalize and validate fields
+              const spec = {
+                templateId: parsed.templateId || 'gradient',
+                top: (parsed.top || '').toString().slice(0, MAX_TEXT_LENGTH),
+                bottom: (parsed.bottom || '').toString().slice(0, MAX_TEXT_LENGTH),
+                width: parseInt(parsed.width, 10) || 1200,
+                height: parseInt(parsed.height, 10) || 675,
+                bg: parsed.bg || null
+              };
+              return res.json({ spec, source: 'llama' });
+            }
+          } catch (err) {
+            console.warn('LLAMA4 call failed, falling back to heuristic parser:', err && err.message);
+          }
+        }
+
+        // Fallback
+        const fallback = parseDescriptionFallback(description);
+        res.json({ spec: fallback, source: 'heuristic' });
+      } catch (err) {
+        console.error('Generate failed:', err);
+        res.status(500).json({ error: err.message });
+      }
+    });
 
 module.exports = { app }; // Export for testing
 
